@@ -223,7 +223,7 @@ There aren’t many other additional predictor variables that are likely to help
 ## Analyze the results
 Now that we have a model that describes the data well with all assumptions met (except constant variance), we would like to use the model to make inferences and predictions. Here is our fitted linear model:
   
-  $\frac{1}{\sqrt{\widehat{\text{Goals}}_i}} = 1.016242 - 0.019850\cdot\text{Appearences}_i$
+$\widehat{\text{1/sqrt(goals)}}_i = 1.0162 - 0.0198x_i $
   
 To start, we will assess the model slopes, confidence intervals of the slopes, and hypothesis tests. Note that our hypothesis tests are not valid since the constant variance assumption was not met, but we will interpret them anyway for practice.
 
@@ -232,29 +232,31 @@ summary(premier_lm)
 confint(premier_lm, level = 0.95, parm = "appearances")
 ```
 
-As number of appearances increases by one, we are 95% confident that the inverse square root of the average number of goals scored per player decreases between 0.0223 and 0.0174. This range suggests that there is a significant relationship between the number of matches played and goals scored. A p-value of < 2.2e-16 indicates the same thing because it is such a small value we feel comfortable rejecting the null hypothesis of a relationship not existing. 
+As number of matches played increases, we are 95% confident that the average number of goals scored
+per player is between 0.0223 and 0.0174. This range suggests that there is a significant relationsihp
+between the number of matches played and goals scored. A p-value of < 2.2e-16 indicates the same thing
+because it is such a small value we feel comfortable rejecting the null hypothesis of a relationship
+existing. 
 
-We now want to get predictions for new players. We are particularly interested in the predicted average number of goals scored for a player that plays in 30 games (an estimate of the average amount of games a soccer player plays in a year). We will use this information to create confidence and prediction intervals for average goals scored.  
+We now want to get predictions for new players. We are particularly interested in the predicted average number of goals scored
+for a player that plays in 45 games (an estimate of the average amount of games a soccer player plays in
+a year). We will use this information to create confidence and prediction intervals for average goals scored.  
 ```{r, fig.align='center'}
-1/predict(premier_lm, 
-        newdata = data.frame(appearances = 30),
+predict(premier_lm, 
+        newdata = data.frame(appearances = 45),
         interval = "confidence",
-        level = 0.95)^2
-```
-
-We are 95% confident that the average number of goals scored by a player who appears 30 times is between 4.72 and 6.89. 
-
-```{r, fig.align='center'}
-1/predict(premier_lm, 
-        newdata = data.frame(appearances = 30),
+        level = 0.95)
+predict(premier_lm, 
+        newdata = data.frame(appearances = 45),
         interval = "prediction",
-        level = 0.95)^2
+        level = 0.95)
 ```
 
-We are 95% confident that if we were to observe one more player who appeared 30 times, he will score between 1.81 and 5.65 times.
+We are 95% confident that the average number of goals per appearances scored by a player in a year is between
+0.053 and 0.193. 
 
-We also plotted the confidence and prediction intervals across all values of games played. You can see that the prediction interval is inaccuate thanks to the badly met assumptions. 
-```{r, fig.align='center',message=FALSE,warning=FALSE}
+We also plotted the confidence and prediction intervals across all values of games played. 
+```{r, fig.align='center'}
 appearances_values <- seq(min(premier$appearances), max(premier$appearances), 
                           length = 100)
 
@@ -263,40 +265,57 @@ conf_int_mean <- predict(premier_lm,
                          interval = "confidence",
                          level = 0.95)
 
-preds <- data.frame("appearances_values" = appearances_values, 1/conf_int_mean^2)
+preds <- data.frame("appearances_values" = appearances_values, conf_int_mean)
 
-premier_plot +
+premier_trans_plot +
   geom_line(data = preds, mapping = aes(x = appearances_values, y = fit),
-            color = "blue", size = 1)+
+            color = "blue", size = 1.5)+
   
   geom_line(data = preds, mapping = aes(x = appearances_values, y = lwr),
-            color = "red", size = 1)+
+            color = "red", size = 1.5)+
   
   geom_line(data = preds, mapping = aes(x = appearances_values, y = upr),
-            color = "red", size = 1)
+            color = "red", size = 1.5)
 
 appearances_values <- seq(min(premier$appearances), max(premier$appearances), 
                           length = 100)
 
-pred_int <- predict(premier_lm, 
+conf_int_mean <- predict(premier_lm, 
                          newdata = data.frame(appearances = appearances_values),
                          interval = "prediction",
                          level = 0.95)
 
-preds <- data.frame("appearances_values" = appearances_values, ifelse(1/pred_int^2 < 30, 1/pred_int^2, NA))
+preds <- data.frame("appearances_values" = appearances_values, conf_int_mean)
 
-premier_plot +
+premier_trans_plot +
   geom_line(data = preds, mapping = aes(x = appearances_values, y = fit),
-            color = "blue", size = 1)+
+            color = "blue", size = 1.5)+
   
   geom_line(data = preds, mapping = aes(x = appearances_values, y = lwr),
-            color = "red", size = 1)+
+            color = "red", size = 1.5)+
   
   geom_line(data = preds, mapping = aes(x = appearances_values, y = upr),
-            color = "red", size = 1)
+            color = "red", size = 1.5)
 ```
+
+Next, we are interested in how well the model fits the data. To do this, we look at metrics such as $R^2$, the RMSE, and the F-Statistic. These metrics are important to check and understand because we can see how well the model fits the dataset and determine how much of the variability can be explained by it. 
+
+$R^2$
 ```{r}
-#MSE
+r2 <- summary(premier_lm)$r.squared
+r2
+
+```
+
+$F-Statistic$
+```{r}
+fstat<- summary(premier_lm)$fstat[1]
+fstat
+```
+
+
+$MSE$ and $RMSE$
+```{r, fig.align='center'}
 anova <- aov(premier_lm)  # get ANOVA components
 premier_anova <- summary(anova)[[1]]  # save data in a usable form
 premier_anova
@@ -304,27 +323,15 @@ premier_anova
 premier_mse <- premier_anova["Residuals", "Sum Sq"] / premier_anova["Residuals", "Df"]
 premier_mse
 
-```
-The MSE in this case is very hard to interpret.
-```{r}
 #RMSE
 premier_rmse <- sqrt(premier_mse)
 premier_rmse
-
 ```
-An RMSE of 0.16 on the scale of the transformed data is fairly large, indicating that the model does not fit the data very well.
-```{r}
-#MAE
-sum(abs(premier_trans$residuals)) / premier_lm$df.residual
 
-```
-See interpretation of RMSE.
+It turns out that the model fits the data pretty well given the assumptions that were not met. An $R^2$ of 70% is rather high, and indicates that the 70% of the variability can be explained by the model that we created with the data. The RMSE tells us that since it is such a low number, 0.16, the model is good at determining the average error performed when predicting the goals. The f-statistic can also tell us that because it is not 1, and rather 259.2, we can reject the null hypothesis of there being no linearity between appearances and goals scored for premier league forwards. 
 
-```{r}
-summary(premier_lm)
-```
-The R-Squared tells us that our model explains about 70% of the variance in the data. This is not too bad, so the model fits the data alright.
+
 
 # Summary and Conclusions
 
-Understanding how many times a player appears in a match affects the number of goals he scores is very important in determining the talent level of a given player, which assists team managers in deciding whether or not to use a team's allotted cap space to sign a player to a lucrative deal. We conducted an analysis to determine how games played impacts goals scored, assuming we would find a significant positive relationship between the two. After fitting a simple linear regression model, we found that matches played, does, indeed, have a significant positive impact on goals scored. We can likely not trust these results, however, since the model didn't fit the data very well and not all the assumptions were met. That is not to say that there is no relationship whatsoever, it just might not be as strong or weak as the model suggests.
+Understanding how many times a player appears in a match affects the number of goals he scores is very important in determining the talent level of a given player, which assists team managers in deciding whether or not to use a team's alloted cap space to sign a player to a lucrative deal. We conducted an analysis to determine how games played impacts goals scored, assuming we would find a significant positive relationship between the two. After fitting a simple linear regression model, we found that matches played, does, indeed, have a significant positive impact on goals scored. We can likely not trust these results, however, since the model didn't fit the data very well. That is not to say that there is no relationship whatsoever, it just might not be as strong or weak as the model suggests.
